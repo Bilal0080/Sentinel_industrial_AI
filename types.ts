@@ -12,6 +12,8 @@ export interface HazardDetail {
   potentialRisk: string;
   preventativeMeasure: string;
   thermalImpact?: string;
+  footwearCause?: string;
+  severity: HazardSeverity;
 }
 
 export interface HealthObservation {

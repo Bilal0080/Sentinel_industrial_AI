@@ -1,6 +1,5 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { HazardSeverity, AnalysisResult, AttendanceHealthAudit, EmployeeFitnessResult, FitnessRoutine } from "../types";
+import { HazardSeverity, AnalysisResult, AttendanceHealthAudit, EmployeeFitnessResult, FitnessRoutine, GroundingSource } from "../types";
 
 export const generateGroundFitnessRoutine = async (workerIssues: string = "general fatigue"): Promise<FitnessRoutine> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -11,16 +10,10 @@ export const generateGroundFitnessRoutine = async (workerIssues: string = "gener
     The user is reporting these issues: ${workerIssues}.
     
     CRITICAL MANDATE:
-    1. START with a mandatory "Hydration Integration" step (addressing the 'no morning water' hazard).
+    1. START with the "Sentinel 1L Protocol": Every worker MUST drink at least 1 Liter of water BEFORE breakfast or any dairy intake. 
     2. Sequence must last exactly 30 minutes total.
-    3. Focus on mobility, lower back decompression, and metabolic alertness.
-    4. Provide steps with clear instructions.
     
-    Return in JSON:
-    - routineName: string
-    - totalDuration: "30 Minutes"
-    - steps: Array of { title, duration, instruction, benefit, focusArea }
-    - warningNote: string about safety during exercise.`,
+    Return in JSON: { routineName, totalDuration, steps: [{title, duration, instruction, benefit, focusArea}], warningNote }`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -71,156 +64,19 @@ export const analyzeImageForHazards = async (base64Image: string): Promise<Analy
           },
         },
         {
-          text: `Act as a specialized industrial safety engineer utilizing the Stop 6 Safety Audit methodology. Analyze this image for critical physical hazards.
+          text: `Act as a specialized industrial safety engineer. Analyze this image for environment hazards.
           
-          STOP 6 CATEGORY MAPPING:
-          - CODE A (Pinch): Moving parts, gears, rollers, or point-of-operation points that could trap limbs.
-          - CODE E (Electrical): Exposed wiring, open panels, overloaded circuits, or water near power.
-          - CODE F (Fall): Work at height, unprotected ledges, floor openings, or slippery ladders.
-          - CODE C (Car/Heavy): Moving vehicles (forklifts, AGVs), heavy loads with wheels, or traffic lane violations.
-          - CODE G (General): Other hazards like fire, gas leaks, structural issues, or SILENT METABOLIC HAZARDS (e.g., lack of hydration stations).
+          SENTINEL PROTOCOL REQUIREMENTS:
+          1. SILENT INTER-EMPLOYEE HAZARDS: Identify conditions that might lead to one employee inadvertently moving another into harm's way (e.g., poor visibility, shared workspace conflicts, slippery transition points).
+          2. TETRA PAK INTEGRITY: Detect any swelling, leaks, or seal failures in UHT containers.
+          3. 1L HYDRATION MANDATE: Analyze worker stance/expression for dehydration indicators (e.g., slumped shoulders, parched lips).
+          4. RISK CODE MAPPING: Categorize hazards using Stop 6 (Pinch, Electrical, Fall, Vehicle, General/Footwear).
 
-          For each hazard found, provide:
-          1. A concise title.
-          2. The Stop 6 Category (Must be one of: A, E, F, C, or G).
-          3. The potential risk/consequence.
-          4. A suggested preventative measure.
-
-          Return the analysis in JSON format with properties: 
-          - hazards: Array of objects { "title", "category", "potentialRisk", "preventativeMeasure" }
-          - severity: One of "LOW", "MEDIUM", "HIGH", "CRITICAL"
-          - recommendations: Array of strings explaining immediate relocation or emergency steps.`
-        }
-      ]
-    },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          hazards: { 
-            type: Type.ARRAY, 
-            items: { 
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                category: { type: Type.STRING, description: "The Stop 6 Code: A, E, F, C, or G" },
-                potentialRisk: { type: Type.STRING },
-                preventativeMeasure: { type: Type.STRING }
-              },
-              required: ["title", "category", "potentialRisk", "preventativeMeasure"]
-            } 
-          },
-          severity: { type: Type.STRING, enum: Object.values(HazardSeverity) },
-          recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-        },
-        required: ["hazards", "severity", "recommendations"]
-      }
-    }
-  });
-
-  try {
-    const text = response.text || '{}';
-    return JSON.parse(text);
-  } catch (error) {
-    console.error("Failed to parse AI response", error);
-    return {
-      hazards: [],
-      severity: HazardSeverity.LOW,
-      recommendations: ["Ensure manual inspection is performed."]
-    };
-  }
-};
-
-export const analyzeEmployeeFitness = async (base64Image: string): Promise<EmployeeFitnessResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: base64Image,
-          },
-        },
-        {
-          text: `Act as an Occupational Health Physician and Safety Compliance Officer. Analyze this employee at shift check-in.
-          
-          ASSESSMENT CRITERIA:
-          1. PHYSICAL STATE: Look for signs of fatigue (heavy eyelids, dark circles), illness (pale skin, sweating), or intoxication/unsteadiness.
-          2. CRITICAL ALERT - MORNING HYDRATION: Look for signs of dehydration (chapped lips, sunken eyes, dry skin). If it is early morning and they show signs of not having drunk water, flag as "UNFIT" or "AT-RISK".
-          3. PPE COMPLIANCE: Is the employee wearing a safety helmet and high-visibility vest?
-          4. READINESS: Do they appear alert and capable of operating heavy machinery?
-
-          Return the analysis in JSON format:
-          - status: One of "FIT", "UNFIT", "AT-RISK".
-          - vitalityScore: Number 0-100 (100 being perfectly healthy and alert).
-          - observations: Array of strings (e.g., "Slight tremors in posture", "Visible dry lips - possible dehydration").
-          - ppeCompliant: Boolean.
-          - detectedSymptoms: Array of strings (e.g., "Fatigue", "Dehydration - No morning water intake suspected").
-          - recommendation: String (e.g., "Refer to hydration station immediately", "Issue safety vest").`
-        }
-      ]
-    },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          status: { type: Type.STRING },
-          vitalityScore: { type: Type.NUMBER },
-          observations: { type: Type.ARRAY, items: { type: Type.STRING } },
-          ppeCompliant: { type: Type.BOOLEAN },
-          detectedSymptoms: { type: Type.ARRAY, items: { type: Type.STRING } },
-          recommendation: { type: Type.STRING }
-        },
-        required: ["status", "vitalityScore", "observations", "ppeCompliant", "detectedSymptoms", "recommendation"]
-      }
-    }
-  });
-
-  try {
-    return JSON.parse(response.text || '{}');
-  } catch (error) {
-    console.error("Fitness analysis parse error", error);
-    throw error;
-  }
-};
-
-export const analyzeHygieneSafety = async (base64Image: string, context: string = "General", ambientTemp: number = 25): Promise<AnalysisResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: base64Image,
-          },
-        },
-        {
-          text: `Act as a senior public health and industrial dietician. Analyze this environment focusing on ${context} in an ambient plant temperature of ${ambientTemp}°C.
-          
-          CRITICAL "BIG HAZARD" ALERT:
-          - EARLY MORNING DEHYDRATION: If workers have not consumed water in the early morning before shift, their core temperature is highly unstable.
-          - If context involves water stations or canteen, check for easy access to drinking water.
-          
-          IF CONTEXT INVOLVES FOOD:
-          - THERMAL-METABOLIC SYNERGY: Analyze how this food affects core body temperature. 
-            * HIGH OIL/FAT: Increases "Thermogenesis" (metabolic heat). In high ambient temps, this prevents the body from cooling down.
-            * HIGH CHILI (MIRCHI): Causes vasodilation and sweating. If workers don't have adequate hydration in high heat (ESPECIALLY NO MORNING WATER), this leads to rapid dehydration and fainting.
-          - RISK ASSESSMENT: If Ambient Temp > 32°C AND food is high oil/spice OR no water intake, flag as CRITICAL.
-          
-          Return analysis in JSON:
-          - hazards: Array of objects { "title", "category", "potentialRisk", "preventativeMeasure", "thermalImpact" }
-          - metabolicHeatIndex: Number 1-10 (How much this food increases internal heat).
-          - severity: One of "LOW", "MEDIUM", "HIGH", "CRITICAL".
-          - recommendations: Specific advice for this temperature (e.g., "Serve cooling yogurt/raita to offset mirchi-induced heat stress").
-          - watchlist: Array of objects { "symptom", "timeframe", "severity", "actionRequired" }.`
+          Return JSON:
+          - hazards: Array of { "title", "category", "potentialRisk", "preventativeMeasure", "footwearCause", "severity" }
+          - severity: Highest level detected (LOW, MEDIUM, HIGH, CRITICAL)
+          - metabolicHeatIndex: Score from 0-10
+          - recommendations: Array of string directives.`
         }
       ]
     },
@@ -238,29 +94,17 @@ export const analyzeHygieneSafety = async (base64Image: string, context: string 
                 category: { type: Type.STRING },
                 potentialRisk: { type: Type.STRING },
                 preventativeMeasure: { type: Type.STRING },
-                thermalImpact: { type: Type.STRING }
+                footwearCause: { type: Type.STRING },
+                severity: { type: Type.STRING, enum: Object.values(HazardSeverity) }
               },
-              required: ["title", "category", "potentialRisk", "preventativeMeasure", "thermalImpact"]
+              required: ["title", "category", "potentialRisk", "preventativeMeasure", "severity"]
             } 
           },
-          metabolicHeatIndex: { type: Type.NUMBER },
           severity: { type: Type.STRING, enum: Object.values(HazardSeverity) },
+          metabolicHeatIndex: { type: Type.NUMBER },
           recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-          watchlist: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                symptom: { type: Type.STRING },
-                timeframe: { type: Type.STRING },
-                severity: { type: Type.STRING, enum: Object.values(HazardSeverity) },
-                actionRequired: { type: Type.STRING }
-              },
-              required: ["symptom", "timeframe", "severity", "actionRequired"]
-            }
-          }
         },
-        required: ["hazards", "metabolicHeatIndex", "severity", "recommendations", "watchlist"]
+        required: ["hazards", "severity", "metabolicHeatIndex", "recommendations"]
       }
     }
   });
@@ -268,64 +112,158 @@ export const analyzeHygieneSafety = async (base64Image: string, context: string 
   try {
     return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Failed to parse AI response", error);
-    return {
-      hazards: [],
-      metabolicHeatIndex: 5,
-      severity: HazardSeverity.LOW,
-      recommendations: ["Manual nutritional audit required."],
-      watchlist: []
-    };
+    console.error("AI Analysis Failed", error);
+    return { hazards: [], severity: HazardSeverity.LOW, metabolicHeatIndex: 0, recommendations: ["System link timed out. Manual audit recommended."] };
   }
 };
 
-export const analyzeAttendanceHealth = async (base64Image: string): Promise<AttendanceHealthAudit> => {
+export const analyzeWashroomSanitation = async (base64Image: string, ambientTemp: number = 25): Promise<AnalysisResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: {
       parts: [
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: base64Image,
-          },
-        },
-        {
-          text: `Act as an industrial Occupational Health & Safety (OHS) analyst. Analyze this shift health report or attendance sheet.
+        { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+        { 
+          text: `Act as an EHS Sanitation Auditor. Analyze this industrial washroom at ambient temp: ${ambientTemp}°C.
           
-          Look for:
-          1. High rates of specific symptoms (e.g., stomach pain, exhaustion, nausea).
-          2. Correlation between these symptoms and recent canteen alerts (oil/mirchi/sanitation).
-          3. CRITICAL: Identify if many workers are reporting dizziness or thirst early in the shift - sign of NO MORNING WATER intake.
+          CRITICAL PROTOCOLS:
+          1. BACTERIAL PROLIFERATION: If temperature is > 35°C, prioritize warnings about rapid microbial growth in stagnant puddles, damp surfaces, or plumbing leaks. This is a severe health risk.
+          2. 1L WATER MANDATE: If temperature is > 35°C, emphasize the sanitation of hydration points. Remind workers that drinking 1 Liter of water BEFORE breakfast is mandatory to counteract metabolic heat stress.
+          3. STANDARD HAZARDS: Identify slips (puddles), plumbing failures, and soap/sanitizer shortages.
           
-          Provide output in JSON:
-          - attendanceRate: number (0-100)
-          - activeSickLeaves: number
-          - topSymptoms: Array of objects { "symptom", "count" }
-          - correlationFindings: string explaining how this links to silent plant hazards.
-          - workforceVitalityScore: number (0-100)
-          - severity: One of "LOW", "MEDIUM", "HIGH", "CRITICAL"`
+          Return JSON:
+          - hazards: Array of { "title", "category", "potentialRisk", "preventativeMeasure", "severity" }
+          - severity: Highest level (LOW, MEDIUM, HIGH, CRITICAL)
+          - recommendations: Array of strings.`
         }
       ]
     },
-    config: {
+    config: { 
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          hazards: { 
+            type: Type.ARRAY, 
+            items: { 
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                category: { type: Type.STRING },
+                potentialRisk: { type: Type.STRING },
+                preventativeMeasure: { type: Type.STRING },
+                severity: { type: Type.STRING, enum: Object.values(HazardSeverity) }
+              },
+              required: ["title", "category", "potentialRisk", "preventativeMeasure", "severity"]
+            } 
+          },
+          severity: { type: Type.STRING, enum: Object.values(HazardSeverity) },
+          recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ["hazards", "severity", "recommendations"]
+      }
+    }
+  });
+  return JSON.parse(response.text || '{}');
+};
+
+export const analyzeHygieneSafety = async (base64Image: string, context: string = "General", ambientTemp: number = 25): Promise<AnalysisResult> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: {
+      parts: [
+        { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+        { 
+          text: `Industrial Hygiene Audit. Context: ${context}. Temp: ${ambientTemp}C.
+          Focus on Tetra Pak integrity and metabolic heat impact of dairy vs the 1L water protocol.`
+        }
+      ]
+    },
+    config: { 
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          hazards: { 
+            type: Type.ARRAY, 
+            items: { 
+              type: Type.OBJECT, 
+              properties: { 
+                title: {type:Type.STRING}, 
+                severity: {type:Type.STRING, enum: Object.values(HazardSeverity)},
+                category: {type:Type.STRING},
+                potentialRisk: {type:Type.STRING},
+                preventativeMeasure: {type:Type.STRING},
+                thermalImpact: {type:Type.STRING}
+              },
+              required: ["title", "severity", "category", "potentialRisk", "preventativeMeasure"]
+            } 
+          },
+          metabolicHeatIndex: { type: Type.NUMBER },
+          severity: { type: Type.STRING, enum: Object.values(HazardSeverity) },
+          recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ["hazards", "metabolicHeatIndex", "severity", "recommendations"]
+      }
+    }
+  });
+  return JSON.parse(response.text || '{}');
+};
+
+export const analyzeEmployeeFitness = async (base64Image: string): Promise<EmployeeFitnessResult> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: {
+      parts: [
+        { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+        { text: `Analyze employee fitness and 1L water compliance status. Return JSON with status (FIT, UNFIT, AT-RISK), vitalityScore (0-100), observations array, ppeCompliant boolean, detectedSymptoms array, and recommendation string.` }
+      ]
+    },
+    config: { 
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          status: { type: Type.STRING, enum: ['FIT', 'UNFIT', 'AT-RISK'] },
+          vitalityScore: { type: Type.NUMBER },
+          observations: { type: Type.ARRAY, items: { type: Type.STRING } },
+          ppeCompliant: { type: Type.BOOLEAN },
+          detectedSymptoms: { type: Type.ARRAY, items: { type: Type.STRING } },
+          recommendation: { type: Type.STRING }
+        },
+        required: ["status", "vitalityScore", "observations", "ppeCompliant", "detectedSymptoms", "recommendation"]
+      }
+    }
+  });
+  return JSON.parse(response.text || '{}');
+};
+
+export const analyzeAttendanceHealth = async (base64Image: string): Promise<AttendanceHealthAudit> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: {
+      parts: [
+        { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+        { text: `Analyze shift health logs for attendance rate, active sick leaves, top symptoms with counts, correlation findings, workforce vitality score (0-100), and overall severity (LOW, MEDIUM, HIGH, CRITICAL).` }
+      ]
+    },
+    config: { 
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
           attendanceRate: { type: Type.NUMBER },
-          activeSickLeaves: { type: Type.INTEGER },
-          topSymptoms: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                symptom: { type: Type.STRING },
-                count: { type: Type.INTEGER }
-              }
-            }
+          activeSickLeaves: { type: Type.NUMBER },
+          topSymptoms: { 
+            type: Type.ARRAY, 
+            items: { 
+              type: Type.OBJECT, 
+              properties: { symptom: { type: Type.STRING }, count: { type: Type.NUMBER } } 
+            } 
           },
           correlationFindings: { type: Type.STRING },
           workforceVitalityScore: { type: Type.NUMBER },
@@ -335,13 +273,7 @@ export const analyzeAttendanceHealth = async (base64Image: string): Promise<Atte
       }
     }
   });
-
-  try {
-    return JSON.parse(response.text || '{}');
-  } catch (error) {
-    console.error("Failed to parse AI response", error);
-    throw error;
-  }
+  return JSON.parse(response.text || '{}');
 };
 
 export const analyzeCanteenSafety = analyzeHygieneSafety;
@@ -350,19 +282,18 @@ export const searchSafetyStandards = async (query: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Find official OSHA or international industrial safety guidelines regarding: ${query}. Focus on silent hazards and sanitation standards.`,
-    config: {
-      tools: [{ googleSearch: {} }],
-    },
+    contents: `Find official safety standards for: ${query}. Focus on industrial regulations.`,
+    config: { tools: [{ googleSearch: {} }] },
   });
+  
+  // Extracting grounding sources from response candidates grounding metadata
+  const sources: GroundingSource[] = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => ({
+    title: chunk.web?.title || 'Safety Standard Source',
+    uri: chunk.web?.uri || ''
+  })).filter((s: GroundingSource) => s.uri !== '') || [];
 
-  const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => ({
-    title: chunk.web?.title || 'Safety Source',
-    uri: chunk.web?.uri || '#'
-  })) || [];
-
-  return {
-    text: response.text,
-    sources
+  return { 
+    text: response.text || "No detailed standard found.", 
+    sources 
   };
 };

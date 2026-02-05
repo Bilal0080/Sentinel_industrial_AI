@@ -9,6 +9,7 @@ import HygieneMonitor from './components/HygieneMonitor';
 import AttendanceMonitor from './components/AttendanceMonitor';
 import SafetyChatbot from './components/SafetyChatbot';
 import GroundFitness from './components/GroundFitness';
+import WashroomMonitor from './components/WashroomMonitor';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -19,6 +20,8 @@ const App: React.FC = () => {
         return <Dashboard />;
       case 'scanner':
         return <HazardScanner />;
+      case 'washroom':
+        return <WashroomMonitor />;
       case 'fitness':
         return <GroundFitness />;
       case 'hygiene':

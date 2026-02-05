@@ -11,6 +11,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'scanner', label: 'Hazard Scanner', icon: '📸' },
+    { id: 'washroom', label: 'Washroom Audit', icon: '🚽' },
     { id: 'fitness', label: 'Ground Fitness', icon: '👟' },
     { id: 'hygiene', label: 'Hygiene & Sanitation', icon: '🧼' },
     { id: 'attendance', label: 'Workforce Health', icon: '👤' },
