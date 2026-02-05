@@ -1,0 +1,9 @@
+{
+  "name": "Sentinel Industrial AI",
+  "description": "An intelligent industrial safety platform that identifies silent environmental hazards, provides real-time safety guidance, and helps employees move each other out of harm's way.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
